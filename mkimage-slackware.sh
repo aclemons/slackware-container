@@ -7,6 +7,7 @@ if [ -z "$ARCH" ]; then
   case "$( uname -m )" in
     i?86) ARCH="" ;;
     arm*) ARCH=arm ;;
+ aarch64) ARCH=aarch64 ;;
        *) ARCH=64 ;;
   esac
 fi
@@ -15,7 +16,13 @@ BUILD_NAME=${BUILD_NAME:-"slackware"}
 VERSION=${VERSION:="current"}
 RELEASENAME=${RELEASENAME:-"slackware${ARCH}"}
 RELEASE=${RELEASE:-"${RELEASENAME}-${VERSION}"}
-MIRROR=${MIRROR:-"http://slackware.osuosl.org"}
+if [ -z "$MIRROR" ]; then
+  if [ "$ARCH" = "arm" ] || [ "$ARCH" = "aarch64" ] ; then
+    MIRROR="http://slackware.uk/slackwarearm"
+  else
+    MIRROR="http://slackware.osuosl.org"
+  fi
+fi
 CACHEFS=${CACHEFS:-"/tmp/${BUILD_NAME}/${RELEASE}"}
 ROOTFS=${ROOTFS:-"/tmp/rootfs-${RELEASE}"}
 CWD=$(pwd)
@@ -90,16 +97,29 @@ function cacheit() {
 
 mkdir -p $ROOTFS $CACHEFS
 
-cacheit "isolinux/initrd.img"
+if [ -z "$INITRD" ]; then
+	if [ "$ARCH" = "arm" ] ; then
+		case "$VERSION" in
+			12*|13*|14.0|14.1) INITRD=initrd-versatile.img ;;
+			*) INITRD=initrd-armv7.img ;;
+		esac
+	elif [ "$ARCH" = "aarch64" ] ; then
+		INITRD=initrd-armv8.img
+	else
+		INITRD=initrd.img
+	fi
+fi
+
+cacheit "isolinux/$INITRD"
 
 cd $ROOTFS
 # extract the initrd to the current rootfs
 ## ./slackware64-14.2/isolinux/initrd.img:    gzip compressed data, last modified: Fri Jun 24 21:14:48 2016, max compression, from Unix, original size 68600832
 ## ./slackware64-current/isolinux/initrd.img: XZ compressed data
-if $(file ${CACHEFS}/isolinux/initrd.img | grep -wq XZ) ; then
-	xzcat "${CACHEFS}/isolinux/initrd.img" | cpio -idvm --null --no-absolute-filenames
+if file ${CACHEFS}/isolinux/$INITRD | grep -wq XZ ; then
+	xzcat "${CACHEFS}/isolinux/$INITRD" | cpio -idvm --null --no-absolute-filenames
 else
-	zcat "${CACHEFS}/isolinux/initrd.img" | cpio -idvm --null --no-absolute-filenames
+	zcat "${CACHEFS}/isolinux/$INITRD" | cpio -idvm --null --no-absolute-filenames
 fi
 
 if stat -c %F $ROOTFS/cdrom | grep -q "symbolic link" ; then
@@ -142,9 +162,9 @@ if [ "$VERSION" = "current" ] || [ "${VERSION}" = "15.0" ]; then
 	root_flag=''
 fi
 
-relbase=$(echo ${RELEASE} | cut -d- -f1)
+relbase=$(echo ${RELEASE} | cut -d- -f1 | sed 's/armedslack/slackware/;s/slackwarearm/slackware/;s/slackwareaarch64/slackware/')
 if [ ! -f ${CACHEFS}/paths ] ; then
-	bash ${CWD}/get_paths.sh -r ${RELEASE} > ${CACHEFS}/paths
+	bash ${CWD}/get_paths.sh -r ${RELEASE} -m ${MIRROR} > ${CACHEFS}/paths
 fi
 for pkg in ${base_pkgs}
 do
@@ -172,6 +192,9 @@ do
 done
 
 cd mnt
+PATH=/bin:/sbin:/usr/bin:/usr/sbin \
+chroot . /bin/sh -c '/sbin/ldconfig'
+
 set -x
 touch etc/resolv.conf
 if [ -e etc/slackpkg/mirrors ] ; then
@@ -199,14 +222,24 @@ mount --bind /etc/resolv.conf etc/resolv.conf
 chroot_slackpkg() {
 	PATH=/bin:/sbin:/usr/bin:/usr/sbin \
 	chroot . /bin/bash -c 'yes y | /usr/sbin/slackpkg -batch=on -default_answer=y update'
+	chroot . /bin/bash -c '/usr/sbin/slackpkg -batch=on -default_answer=y upgrade slackpkg || true'
+	if [ -e etc/slackpkg/mirrors.new ] ; then
+		mv etc/slackpkg/mirrors.new etc/slackpkg/mirrors
+		echo "${MIRROR}/${RELEASE}/" >> etc/slackpkg/mirrors
+	fi
+	if [ -e etc/slackpkg/slackpkg.conf.new ] ; then
+		mv etc/slackpkg/slackpkg.conf.new etc/slackpkg/slackpkg.conf
+		sed -i 's/DIALOG=on/DIALOG=off/' etc/slackpkg/slackpkg.conf
+		sed -i 's/POSTINST=on/POSTINST=off/' etc/slackpkg/slackpkg.conf
+		sed -i 's/SPINNING=on/SPINNING=off/' etc/slackpkg/slackpkg.conf
+	fi
+	chroot . /bin/bash -c 'yes y | /usr/sbin/slackpkg -batch=on -default_answer=y update'
 	ret=0
 	PATH=/bin:/sbin:/usr/bin:/usr/sbin \
 	chroot . /bin/bash -c '/usr/sbin/slackpkg -batch=on -default_answer=y upgrade-all' || ret=$?
 	if [ $ret -eq 0 ] || [ $ret -eq 20 ] ; then
-		echo "uprade-all is OK"
+		echo "upgrade-all is OK"
 		return
-	elif [ $ret -eq 50 ] ; then
-		chroot_slackpkg
 	else
 		return $?
 	fi
