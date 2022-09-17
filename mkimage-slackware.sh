@@ -167,14 +167,31 @@ relbase=$(echo ${RELEASE} | cut -d- -f1 | sed 's/armedslack/slackware/;s/slackwa
 if [ ! -f ${CACHEFS}/paths ] ; then
 	bash ${CWD}/get_paths.sh -r ${RELEASE} -m ${MIRROR} > ${CACHEFS}/paths
 fi
+if [ ! -f ${CACHEFS}/paths-patches ] ; then
+	bash ${CWD}/get_paths.sh -r ${RELEASE} -m ${MIRROR} -p > ${CACHEFS}/paths-patches
+fi
+if [ ! -f ${CACHEFS}/paths-extra ] ; then
+	bash ${CWD}/get_paths.sh -r ${RELEASE} -m ${MIRROR} -e > ${CACHEFS}/paths-extra
+fi
 for pkg in ${base_pkgs}
 do
-	path=$(grep ^${pkg} ${CACHEFS}/paths | cut -d : -f 1)
+	path=$(grep "^packages/$(basename "${pkg}")-" ${CACHEFS}/paths-patches | cut -d : -f 1)
 	if [ ${#path} -eq 0 ] ; then
-		echo "$pkg not found"
-		continue
+		path=$(grep ^${pkg}- ${CACHEFS}/paths | cut -d : -f 1)
+		if [ ${#path} -eq 0 ] ; then
+			path=$(grep "^$(basename "${pkg}")/$(basename "${pkg}")-" ${CACHEFS}/paths-extra | cut -d : -f 1)
+			if [ ${#path} -eq 0 ] ; then
+				echo "$pkg not found"
+				continue
+			else
+				l_pkg=$(cacheit extra/$path)
+			fi
+		else
+			l_pkg=$(cacheit $relbase/$path)
+		fi
+	else
+		l_pkg=$(cacheit patches/$path)
 	fi
-	l_pkg=$(cacheit $relbase/$path)
 	if [ -e ./sbin/upgradepkg ] ; then
 		echo PATH=/bin:/sbin:/usr/bin:/usr/sbin \
 		ROOT=/mnt \
@@ -196,8 +213,17 @@ cd mnt
 PATH=/bin:/sbin:/usr/bin:/usr/sbin \
 chroot . /bin/sh -c '/sbin/ldconfig'
 
+if [ ! -e ./root/.gnupg ] ; then
+	cacheit "GPG-KEY"
+	cp ${CACHEFS}/GPG-KEY .
+	echo PATH=/bin:/sbin:/usr/bin:/usr/sbin \
+	chroot . /usr/bin/gpg --import GPG-KEY
+	PATH=/bin:/sbin:/usr/bin:/usr/sbin \
+	chroot . /usr/bin/gpg --import GPG-KEY
+	rm GPG-KEY
+fi
+
 set -x
-touch etc/resolv.conf
 if [ "$MINIMAL" = "yes" ] || [ "$MINIMAL" = "1" ] ; then
 	echo "export TERM=linux" >> etc/profile.d/term.sh
 	chmod +x etc/profile.d/term.sh
@@ -208,6 +234,10 @@ if [ -e etc/slackpkg/mirrors ] ; then
 	sed -i 's/DIALOG=on/DIALOG=off/' etc/slackpkg/slackpkg.conf
 	sed -i 's/POSTINST=on/POSTINST=off/' etc/slackpkg/slackpkg.conf
 	sed -i 's/SPINNING=on/SPINNING=off/' etc/slackpkg/slackpkg.conf
+	if [ "$VERSION" = "current" ] ; then
+		mkdir -p var/lib/slackpkg
+		touch var/lib/slackpkg/current
+	fi
 fi
 if [ ! -f etc/rc.d/rc.local ] ; then
 	mkdir -p etc/rc.d
@@ -220,39 +250,6 @@ EOF
 	chmod +x etc/rc.d/rc.local
 fi
 
-mount --bind /etc/resolv.conf etc/resolv.conf
-
-# for slackware 15.0, slackpkg return codes are now:
-# 0 -> All OK, 1 -> something wrong, 20 -> empty list, 50 -> Slackpkg upgraded, 100 -> no pending updates
-chroot_slackpkg() {
-	PATH=/bin:/sbin:/usr/bin:/usr/sbin \
-	chroot . /bin/bash -c 'yes y | /usr/sbin/slackpkg -batch=on -default_answer=y update'
-	chroot . /bin/bash -c '/usr/sbin/slackpkg -batch=on -default_answer=y upgrade slackpkg || true'
-	if [ -e etc/slackpkg/mirrors.new ] ; then
-		mv etc/slackpkg/mirrors.new etc/slackpkg/mirrors
-		echo "${MIRROR}/${RELEASE}/" >> etc/slackpkg/mirrors
-	fi
-	if [ -e etc/slackpkg/slackpkg.conf.new ] ; then
-		mv etc/slackpkg/slackpkg.conf.new etc/slackpkg/slackpkg.conf
-		sed -i 's/DIALOG=on/DIALOG=off/' etc/slackpkg/slackpkg.conf
-		sed -i 's/POSTINST=on/POSTINST=off/' etc/slackpkg/slackpkg.conf
-		sed -i 's/SPINNING=on/SPINNING=off/' etc/slackpkg/slackpkg.conf
-	fi
-	chroot . /bin/bash -c 'yes y | /usr/sbin/slackpkg -batch=on -default_answer=y update'
-	ret=0
-	PATH=/bin:/sbin:/usr/bin:/usr/sbin \
-	chroot . /bin/bash -c '/usr/sbin/slackpkg -batch=on -default_answer=y upgrade-all' || ret=$?
-	if [ $ret -eq 0 ] || [ $ret -eq 20 ] ; then
-		echo "upgrade-all is OK"
-		return
-	else
-		return $?
-	fi
-}
-if [ -e etc/slackpkg/mirrors ] ; then
-  chroot_slackpkg
-fi
-
 # now some cleanup of the minimal image
 set +x
 rm -rf var/lib/slackpkg/*
@@ -263,7 +260,6 @@ if [ "$MINIMAL" = "yes" ] || [ "$MINIMAL" = "1" ] ; then
 fi
 umount $ROOTFS/dev
 rm -f dev/* # containers should expect the kernel API (`mount -t devtmpfs none /dev`)
-umount etc/resolv.conf
 
 tar --numeric-owner -cf- . > ${CWD}/${RELEASE}.tar
 ls -sh ${CWD}/${RELEASE}.tar
