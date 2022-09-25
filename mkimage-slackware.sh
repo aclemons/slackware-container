@@ -132,7 +132,17 @@ cd $ROOTFS
 if file ${CACHEFS}/isolinux/$INITRD | grep -wq XZ ; then
 	xzcat "${CACHEFS}/isolinux/$INITRD" | cpio -idvm --null --no-absolute-filenames
 else
-	zcat "${CACHEFS}/isolinux/$INITRD" | cpio -idvm --null --no-absolute-filenames
+	zcat "${CACHEFS}/isolinux/$INITRD" > ${CACHEFS}/isolinux/$INITRD.decompressed
+	if file ${CACHEFS}/isolinux/$INITRD.decompressed | grep -wq cpio ; then
+		< "${CACHEFS}/isolinux/$INITRD".decompressed cpio -idvm --null --no-absolute-filenames
+	else
+		mkdir -p $ROOTFS.mnt
+		mount -o loop ${CACHEFS}/isolinux/$INITRD.decompressed $ROOTFS.mnt
+		rsync -aAXHv $ROOTFS.mnt/ $ROOTFS
+		umount $ROOTFS.mnt
+		rm -rf $ROOTFS.mnt
+		(cd bin && ln -sf gzip.bin gzip)
+	fi
 fi
 
 if stat -c %F $ROOTFS/cdrom | grep -q "symbolic link" ; then
@@ -258,6 +268,9 @@ if [ "$MINIMAL" = "yes" ] || [ "$MINIMAL" = "1" ] ; then
 	echo "export TERM=linux" >> etc/profile.d/term.sh
 	chmod +x etc/profile.d/term.sh
 	echo ". /etc/profile" > .bashrc
+fi
+if [ -e etc/slackpkg ] ; then
+	find etc/slackpkg/ -type f -name "*.new" -exec rename ".new" "" {} \;
 fi
 if [ -e etc/slackpkg/mirrors ] ; then
 	echo "${MIRROR}/${RELEASE}/" >> etc/slackpkg/mirrors
