@@ -36,6 +36,8 @@ base_pkgs="a/aaa_base \
 	a/glibc-solibs \
 	a/aaa_glibc-solibs \
 	a/aaa_terminfo \
+	a/fileutils \
+	a/sh-utils \
 	a/pam \
 	a/cracklib \
 	a/libpwquality \
@@ -145,7 +147,9 @@ else
 		rsync -aAXHv $ROOTFS.mnt/ $ROOTFS
 		umount $ROOTFS.mnt
 		rm -rf $ROOTFS.mnt
-		(cd bin && ln -sf gzip.bin gzip)
+		if [ -e bin/gzip.bin ] ; then
+			(cd bin && ln -sf gzip.bin gzip)
+		fi
 	fi
 fi
 
@@ -257,7 +261,7 @@ PATH=/bin:/sbin:/usr/bin:/usr/sbin \
 chroot . /bin/sh -c '/sbin/ldconfig'
 
 # slackpkg would normally do this on first invocation
-if [ ! -e ./root/.gnupg ] ; then
+if [ ! -e ./root/.gnupg ] && [ -e ./usr/bin/gpg ] ; then
 	cacheit "GPG-KEY"
 	cp ${CACHEFS}/GPG-KEY .
 	echo PATH=/bin:/sbin:/usr/bin:/usr/sbin \
