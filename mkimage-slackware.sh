@@ -29,6 +29,7 @@ MINIMAL=${MINIMAL:-yes}
 CWD=$(pwd)
 
 base_pkgs="a/aaa_base \
+	a/elflibs \
 	a/aaa_elflibs \
 	a/aaa_libraries \
 	a/coreutils \
@@ -50,10 +51,12 @@ base_pkgs="a/aaa_base \
 	a/gzip \
 	l/pcre2 \
 	l/libpsl \
+	l/libusb \
 	n/wget \
 	n/gnupg \
 	a/elvis \
 	ap/slackpkg \
+	slackpkg-0.99 \
 	l/ncurses \
 	a/bin \
 	a/bzip2 \
