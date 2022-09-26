@@ -49,6 +49,7 @@ base_pkgs="a/aaa_base \
 	a/bash \
 	a/etc \
 	a/gzip \
+	a/textutils \
 	l/pcre2 \
 	l/libpsl \
 	l/libusb \
