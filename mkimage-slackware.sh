@@ -122,7 +122,13 @@ if [ -z "$INITRD" ]; then
 	fi
 fi
 
-cacheit "isolinux/$INITRD"
+if [ "$ARCH" = "aarch64" ] ; then
+	cacheit "installer/$INITRD"
+	mv ${CACHEFS}/installer ${CACHEFS}/isolinux
+	cacheit "installer/$INITRD"
+else
+	cacheit "isolinux/$INITRD"
+fi
 
 cd $ROOTFS
 # extract the initrd to the current rootfs
