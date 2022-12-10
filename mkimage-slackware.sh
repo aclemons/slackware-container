@@ -300,7 +300,6 @@ fi
 
 # now some cleanup of the minimal image
 set +x
-rm -rf var/lib/slackpkg/*
 if [ "$MINIMAL" = "yes" ] || [ "$MINIMAL" = "1" ] ; then
 	rm -rf usr/share/locale/*
 	rm -rf usr/man/*
@@ -317,5 +316,3 @@ for dir in cdrom dev sys proc ; do
 		umount $ROOTFS/$dir
 	fi
 done
-
-
