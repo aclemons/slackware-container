@@ -41,6 +41,7 @@ base_pkgs="a/aaa_base \
 	a/pam \
 	a/cracklib \
 	a/libpwquality \
+	a/lzlib \
 	a/e2fsprogs \
 	a/nvi \
 	a/pkgtools \
