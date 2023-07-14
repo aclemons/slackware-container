@@ -18,9 +18,9 @@ RELEASENAME=${RELEASENAME:-"slackware${ARCH}"}
 RELEASE=${RELEASE:-"${RELEASENAME}-${VERSION}"}
 if [ -z "$MIRROR" ]; then
   if [ "$ARCH" = "arm" ] || [ "$ARCH" = "aarch64" ] ; then
-    MIRROR="http://slackware.uk/slackwarearm"
+    MIRROR=${MIRROR:-"http://slackware.uk/slackwarearm"}
   else
-    MIRROR="http://slackware.osuosl.org"
+    MIRROR=${MIRROR:-"http://slackware.osuosl.org"}
   fi
 fi
 CACHEFS=${CACHEFS:-"/tmp/${BUILD_NAME}/${RELEASE}"}
