@@ -26,6 +26,7 @@ fi
 CACHEFS=${CACHEFS:-"/tmp/${BUILD_NAME}/${RELEASE}"}
 ROOTFS=${ROOTFS:-"/tmp/rootfs-${RELEASE}"}
 MINIMAL=${MINIMAL:-yes}
+CHECKSUMS=${CHECKSUMS:-no}
 CWD=$(pwd)
 
 base_pkgs="a/aaa_base \
@@ -67,7 +68,7 @@ base_pkgs="a/aaa_base \
 	a/acl \
 	l/pcre \
 	l/gmp \
- 	a/attr \
+	a/attr \
 	a/sed \
 	a/dialog \
 	a/file \
@@ -99,16 +100,40 @@ if [ "$VERSION" = "15.0" ] && [ "$ARCH" = "arm" ] ; then
 fi
 
 function cacheit() {
-	file=$1
+	local file=$1
+	local check=$2
 	if [ ! -f "${CACHEFS}/${file}"  ] ; then
 		mkdir -p $(dirname ${CACHEFS}/${file})
 		echo "Fetching ${MIRROR}/${RELEASE}/${file}" >&2
 		curl -s -o "${CACHEFS}/${file}" "${MIRROR}/${RELEASE}/${file}"
+
+		if [ "$CHECKSUMS" = "yes" ] || [ "$CHECKSUMS" = "1" ] ; then
+			if [ "$check" = "md5" ] || [ "$check" = "both" ] ; then
+				(
+					cd "${CACHEFS}"
+					grep "${file}"$ "CHECKSUMS.md5" | md5sum --strict --check --quiet || { ret=$? && rm -f "${file}" && return "$ret" ; }
+				)
+			fi
+			if [ "$check" = "both" ] ; then
+				cacheit "${file}".asc > /dev/null
+				gpg --batch --verify "${CACHEFS}/${file}.asc" "${CACHEFS}/${file}" || { ret=$? && rm -f "${CACHEFS}/${file}"* && return "$ret" ; }
+			fi
+		fi
 	fi
 	echo "/cdrom/${file}"
 }
 
 mkdir -p $ROOTFS $CACHEFS
+
+if [ "$CHECKSUMS" = "yes" ] || [ "$CHECKSUMS" = "1" ] ; then
+	cacheit "CHECKSUMS.md5"
+	cacheit "CHECKSUMS.md5.asc"
+
+	gpg --batch --verify "${CACHEFS}/CHECKSUMS.md5.asc" "${CACHEFS}/CHECKSUMS.md5" || { ret=$? && rm "${CACHEFS}/CHECKSUMS.md5"* && exit "$ret" ; }
+elif [ "$CHECKSUMS" = "yes-no-checksums-gpg" ] ; then
+	CHECKSUMS=1
+	cacheit "CHECKSUMS.md5"
+fi
 
 if [ -z "$INITRD" ]; then
 	if [ "$ARCH" = "arm" ] ; then
@@ -124,11 +149,10 @@ if [ -z "$INITRD" ]; then
 fi
 
 if [ "$ARCH" = "aarch64" ] ; then
-	cacheit "installer/$INITRD"
+	cacheit "installer/$INITRD" "md5"
 	mv ${CACHEFS}/installer ${CACHEFS}/isolinux
-	cacheit "installer/$INITRD"
 else
-	cacheit "isolinux/$INITRD"
+	cacheit "isolinux/$INITRD" "md5"
 fi
 
 cd $ROOTFS
@@ -151,6 +175,7 @@ else
 			(cd bin && ln -sf gzip.bin gzip)
 		fi
 	fi
+	rm "${CACHEFS}/isolinux/$INITRD".decompressed
 fi
 
 if stat -c %F $ROOTFS/cdrom | grep -q "symbolic link" ; then
@@ -220,13 +245,13 @@ do
 				echo "$pkg not found"
 				continue
 			else
-				l_pkg=$(cacheit extra/$path)
+				l_pkg=$(cacheit extra/$path "both")
 			fi
 		else
-			l_pkg=$(cacheit $relbase/$path)
+			l_pkg=$(cacheit $relbase/$path "both")
 		fi
 	else
-		l_pkg=$(cacheit patches/$path)
+		l_pkg=$(cacheit patches/$path "both")
 	fi
 	if $installer_fix ; then
 		echo PATH=/bin:/sbin:/usr/bin:/usr/sbin \
@@ -262,12 +287,12 @@ chroot . /bin/sh -c '/sbin/ldconfig'
 
 # slackpkg would normally do this on first invocation
 if [ ! -e ./root/.gnupg ] && [ -e ./usr/bin/gpg ] ; then
-	cacheit "GPG-KEY"
+	cacheit "GPG-KEY" "md5"
 	cp ${CACHEFS}/GPG-KEY .
 	echo PATH=/bin:/sbin:/usr/bin:/usr/sbin \
-	chroot . /usr/bin/gpg --import GPG-KEY
+	GNUPGHOME='' chroot . /usr/bin/gpg --import GPG-KEY
 	PATH=/bin:/sbin:/usr/bin:/usr/sbin \
-	chroot . /usr/bin/gpg --import GPG-KEY
+	GNUPGHOME='' chroot . /usr/bin/gpg --import GPG-KEY
 	rm GPG-KEY
 fi
 
