@@ -29,45 +29,65 @@ MINIMAL=${MINIMAL:-yes}
 CHECKSUMS=${CHECKSUMS:-no}
 CWD=$(pwd)
 
+# a => a1
+
 base_pkgs="a/aaa_base \
+	a1/aaa_base \
 	a/elflibs \
+	a1/elflibs \
 	a/aaa_elflibs \
 	a/aaa_libraries \
 	a/coreutils \
 	a/glibc-solibs \
+	a1/glibcso \
 	a/aaa_glibc-solibs \
 	a/aaa_terminfo \
 	a/fileutils \
+	a1/fileutls \
 	a/sh-utils \
 	a/pam \
 	a/cracklib \
 	a/libpwquality \
 	a/lzlib \
 	a/e2fsprogs \
+	a1/e2fsprog \
 	a/nvi \
 	a/pkgtools \
 	a/shadow \
+	a1/shadow \
 	a/tar \
+	a1/tar \
 	a/xz \
 	a/bash \
+	a1/bash \
+	a1/bash1 \
 	a/etc \
+	a1/etc \
 	a/gzip \
+	a1/gzip \
 	a/textutils \
 	l/pcre2 \
 	l/libpsl \
 	l/libusb \
 	n/wget \
+	n1/wget \
 	n/gnupg \
 	a/elvis \
+	a1/elvis \
 	ap/slackpkg \
 	slackpkg-0.99 \
 	l/ncurses \
+	d1/ncurses \
 	a/bin \
+	a1/bin \
 	a/bzip2 \
+	a1/bzip2 \
 	a/grep \
+	a1/grep \
 	a/acl \
 	l/pcre \
 	l/gmp \
+	gtk1/gmp \
 	a/attr \
 	a/sed \
 	a/dialog \
@@ -75,6 +95,7 @@ base_pkgs="a/aaa_base \
 	a/gawk \
 	a/time \
 	a/gettext \
+	d1/gettext \
 	a/libcgroup \
 	a/patch \
 	a/sysfsutils \
@@ -88,11 +109,15 @@ base_pkgs="a/aaa_base \
 	l/mpfr \
 	l/libunistring \
 	ap/diffutils \
+	ap1/diff \
 	a/procps \
+	a1/procps \
 	n/net-tools \
 	a/findutils \
+	a1/find \
 	n/iproute2 \
-	n/openssl"
+	n/openssl \
+	n1/openssl"
 
 if [ "$VERSION" = "15.0" ] && [ "$ARCH" = "arm" ] ; then
 	base_pkgs="installer_fix \
@@ -218,7 +243,6 @@ if [ "$VERSION" = "current" ] || [ "${VERSION}" = "15.0" ]; then
 	root_flag=''
 fi
 
-relbase=$(echo ${RELEASE} | cut -d- -f1 | sed 's/armedslack/slackware/;s/slackwarearm/slackware/;s/slackwareaarch64/slackware/')
 if [ ! -f ${CACHEFS}/paths ] ; then
 	bash ${CWD}/get_paths.sh -r ${RELEASE} -m ${MIRROR} > ${CACHEFS}/paths
 fi
@@ -228,6 +252,13 @@ fi
 if [ ! -f ${CACHEFS}/paths-extra ] ; then
 	bash ${CWD}/get_paths.sh -r ${RELEASE} -m ${MIRROR} -e > ${CACHEFS}/paths-extra
 fi
+if echo "${1}" | grep slackware-8.0 > /dev/null 2>&1 ; then
+  relbase=$(echo ${RELEASE} | cut -d- -f1 | sed 's/armedslack/slackware/;s/slackwarearm/slackware/;s/slackwareaarch64/slackware/')
+  pkgdelimiter="\."
+else
+  relbase=$(echo ${RELEASE} | cut -d- -f1 | sed 's/armedslack/slackware/;s/slackwarearm/slackware/;s/slackwareaarch64/slackware/')
+  pkgdelimiter="-"
+fi
 for pkg in ${base_pkgs}
 do
 	installer_fix=false
@@ -236,11 +267,11 @@ do
 		installer_fix=true
 		pkg=a/aaa_glibc-solibs
 	fi
-	path=$(grep "^packages/$(basename "${pkg}")-" ${CACHEFS}/paths-patches | cut -d : -f 1)
+	path=$(grep "^packages/$(basename "${pkg}")$pkgdelimiter" ${CACHEFS}/paths-patches | cut -d : -f 1)
 	if [ ${#path} -eq 0 ] ; then
-		path=$(grep ^${pkg}- ${CACHEFS}/paths | cut -d : -f 1)
+		path=$(grep ^${pkg}$pkgdelimiter ${CACHEFS}/paths | cut -d : -f 1)
 		if [ ${#path} -eq 0 ] ; then
-			path=$(grep "^$(basename "${pkg}")/$(basename "${pkg}")-" ${CACHEFS}/paths-extra | cut -d : -f 1)
+			path=$(grep "^$(basename "${pkg}")/$(basename "${pkg}")$pkgdelimiter" ${CACHEFS}/paths-extra | cut -d : -f 1)
 			if [ ${#path} -eq 0 ] ; then
 				echo "$pkg not found"
 				continue

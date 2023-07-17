@@ -12,7 +12,11 @@ _usage() {
 }
 
 _release_base() {
-    echo "${1}" | cut -d - -f 1 | sed 's/armedslack/slackware/;s/slackwarearm/slackware/;s/slackwareaarch64/slackware/'
+    if echo "${1}" | grep slackware-8.0 > /dev/null 2>&1 ; then
+      echo "slakware"
+    else
+      echo "${1}" | cut -d - -f 1 | sed 's/armedslack/slackware/;s/slackwarearm/slackware/;s/slackwareaarch64/slackware/'
+    fi
 }
 
 _fetch_file_list() {
@@ -21,7 +25,11 @@ _fetch_file_list() {
     local directory="${3}"
     local ret
 
-    curl -sSL "${mirror}/${release}/${directory}/FILE_LIST"
+    if [ "$release" = "slackware-8.0" ] ; then
+      curl -sSL "${mirror}/${release}/${directory}/CHECKSUMS.md5"
+    else
+      curl -sSL "${mirror}/${release}/${directory}/FILE_LIST"
+    fi
     ret=$?
     if [ $ret -ne 0 ] ; then
         return $ret
