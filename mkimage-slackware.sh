@@ -175,6 +175,7 @@ else
 			(cd bin && ln -sf gzip.bin gzip)
 		fi
 	fi
+	rm "${CACHEFS}/isolinux/$INITRD".decompressed
 fi
 
 if stat -c %F $ROOTFS/cdrom | grep -q "symbolic link" ; then
