@@ -125,6 +125,10 @@ function cacheit() {
 
 mkdir -p $ROOTFS $CACHEFS
 
+# clear any checksums, filelists so we know if the cache is up to date
+rm -f "${CACHEFS}"/CHECKSUMS.md5*
+rm -f "${CACHEFS}"/paths*
+
 if [ "$CHECKSUMS" = "yes" ] || [ "$CHECKSUMS" = "1" ] ; then
 	cacheit "CHECKSUMS.md5"
 	cacheit "CHECKSUMS.md5.asc"
@@ -342,3 +346,7 @@ for dir in cdrom dev sys proc ; do
 		umount $ROOTFS/$dir
 	fi
 done
+
+# clear any checksums, filelists for the next run
+rm -f "${CACHEFS}"/CHECKSUMS.md5*
+rm -f "${CACHEFS}"/paths*
