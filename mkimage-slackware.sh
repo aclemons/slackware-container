@@ -99,6 +99,20 @@ if [ "$VERSION" = "15.0" ] && [ "$ARCH" = "arm" ] ; then
 	$base_pkgs"
 fi
 
+# TODO mark as 15.1
+if [ "$VERSION" = "current" ] ; then
+	base_pkgs="$base_pkgs \
+	ap/sqlite \
+	n/libgcrypt \
+	n/libassuan \
+	n/npth \
+	n/libgpg-error \
+	l/icu4c \
+	n/libksba \
+	n/gnupg2"
+fi
+
+
 function cacheit() {
 	local file=$1
 	local check=$2
@@ -288,7 +302,7 @@ cd mnt
 PATH=/bin:/sbin:/usr/bin:/usr/sbin \
 chroot . /bin/sh -c '/sbin/ldconfig'
 
-if [ ! -e ./root/.gnupg ] && [ -e ./usr/bin/gpg ] ; then
+if [ ! -e ./root/.gnupg ] && { [ -e ./usr/bin/gpg ] || [ -e ./usr/bin/gpg2 ] ; } ; then
 	cacheit "GPG-KEY" "md5"
 	cp ${CACHEFS}/GPG-KEY .
 	echo PATH=/bin:/sbin:/usr/bin:/usr/sbin \
