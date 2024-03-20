@@ -302,15 +302,15 @@ cd mnt
 PATH=/bin:/sbin:/usr/bin:/usr/sbin \
 chroot . /bin/sh -c '/sbin/ldconfig'
 
-if [ ! -e ./root/.gnupg ] && { [ -e ./usr/bin/gpg ] || [ -e ./usr/bin/gpg2 ] ; } ; then
-	cacheit "GPG-KEY" "md5"
-	cp ${CACHEFS}/GPG-KEY .
-	echo PATH=/bin:/sbin:/usr/bin:/usr/sbin \
-	GNUPGHOME='' chroot . /usr/bin/gpg --import GPG-KEY
-	PATH=/bin:/sbin:/usr/bin:/usr/sbin \
-	GNUPGHOME='' chroot . /usr/bin/gpg --import GPG-KEY
-	rm GPG-KEY
-fi
+# if [ ! -e ./root/.gnupg ] && { [ -e ./usr/bin/gpg ] || [ -e ./usr/bin/gpg2 ] ; } ; then
+# 	cacheit "GPG-KEY" "md5"
+# 	cp ${CACHEFS}/GPG-KEY .
+# 	echo PATH=/bin:/sbin:/usr/bin:/usr/sbin \
+# 	GNUPGHOME='' chroot . /usr/bin/gpg --import GPG-KEY
+# 	PATH=/bin:/sbin:/usr/bin:/usr/sbin \
+# 	GNUPGHOME='' chroot . /usr/bin/gpg --import GPG-KEY
+# 	rm GPG-KEY
+# fi
 
 set -x
 if [ "$MINIMAL" = "yes" ] || [ "$MINIMAL" = "1" ] ; then
