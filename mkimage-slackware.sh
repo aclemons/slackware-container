@@ -29,45 +29,65 @@ MINIMAL=${MINIMAL:-yes}
 CHECKSUMS=${CHECKSUMS:-no}
 CWD=$(pwd)
 
+# a => a1
+
 base_pkgs="a/aaa_base \
+	a1/aaa_base \
 	a/elflibs \
+	a1/elflibs \
 	a/aaa_elflibs \
 	a/aaa_libraries \
 	a/coreutils \
 	a/glibc-solibs \
+	a1/glibcso \
 	a/aaa_glibc-solibs \
 	a/aaa_terminfo \
 	a/fileutils \
+	a1/fileutls \
 	a/sh-utils \
 	a/pam \
 	a/cracklib \
 	a/libpwquality \
 	a/lzlib \
 	a/e2fsprogs \
+	a1/e2fsprog \
 	a/nvi \
 	a/pkgtools \
 	a/shadow \
+	a1/shadow \
 	a/tar \
+	a1/tar \
 	a/xz \
 	a/bash \
+	a1/bash \
+	a1/bash1 \
 	a/etc \
+	a1/etc \
 	a/gzip \
+	a1/gzip \
 	a/textutils \
 	l/pcre2 \
 	l/libpsl \
 	l/libusb \
 	n/wget \
+	n1/wget \
 	n/gnupg \
 	a/elvis \
+	a1/elvis \
 	ap/slackpkg \
 	slackpkg-0.99 \
 	l/ncurses \
+	d1/ncurses \
 	a/bin \
+	a1/bin \
 	a/bzip2 \
+	a1/bzip2 \
 	a/grep \
+	a1/grep \
 	a/acl \
 	l/pcre \
 	l/gmp \
+	gtk1/gmp \
 	a/attr \
 	a/sed \
 	a/dialog \
@@ -75,6 +95,7 @@ base_pkgs="a/aaa_base \
 	a/gawk \
 	a/time \
 	a/gettext \
+	d1/gettext \
 	a/libcgroup \
 	a/patch \
 	a/sysfsutils \
@@ -88,11 +109,15 @@ base_pkgs="a/aaa_base \
 	l/mpfr \
 	l/libunistring \
 	ap/diffutils \
+	ap1/diff \
 	a/procps \
+	a1/procps \
 	n/net-tools \
 	a/findutils \
+	a1/find \
 	n/iproute2 \
-	n/openssl"
+	n/openssl \
+	n1/openssl"
 
 if [ "$VERSION" = "15.0" ] && [ "$ARCH" = "arm" ] ; then
 	base_pkgs="installer_fix \
@@ -155,6 +180,10 @@ fi
 if [ "$ARCH" = "aarch64" ] ; then
 	cacheit "installer/$INITRD" "md5"
 	mv ${CACHEFS}/installer ${CACHEFS}/isolinux
+elif [ "$VERSION" = "8.0" ] ; then
+	cacheit "rootdsks/color.gz" "md5"
+	mkdir -p ${CACHEFS}/isolinux
+	mv ${CACHEFS}/rootdsks/color.gz ${CACHEFS}/isolinux/$INITRD
 else
 	cacheit "isolinux/$INITRD" "md5"
 fi
@@ -203,14 +232,13 @@ cp etc/ld.so.conf mnt/etc
 
 # older versions than 13.37 did not have certain flags
 install_args=""
-if [ -f ./sbin/upgradepkg ] &&  grep -qw terse ./sbin/upgradepkg ; then
+if [ -f ./sbin/upgradepkg ] && grep -qw terse ./sbin/upgradepkg ; then
 	install_args="--install-new --reinstall --terse"
-elif [ -f ./usr/lib/setup/installpkg ] &&  grep -qw terse ./usr/lib/setup/installpkg ; then
+elif [ -f ./usr/lib/setup/installpkg ] && grep -qw terse ./usr/lib/setup/installpkg ; then
 	install_args="--terse"
 fi
 
 # an update in upgradepkg during the 14.2 -> 15.0 cycle changed/broke this
-root_env=""
 root_flag=""
 if [ -f ./sbin/upgradepkg ] && grep -qw -- '"--root"' ./sbin/upgradepkg ; then
 	root_flag="--root /mnt"
@@ -218,19 +246,16 @@ elif [ -f ./usr/lib/setup/installpkg ] && grep -qw -- '"-root"' ./usr/lib/setup/
 	root_flag="-root /mnt"
 fi
 if [ "$VERSION" = "current" ] || [ "${VERSION}" = "15.0" ]; then
-	root_env='ROOT=/mnt'
 	root_flag=''
 fi
 
-relbase=$(echo ${RELEASE} | cut -d- -f1 | sed 's/armedslack/slackware/;s/slackwarearm/slackware/;s/slackwareaarch64/slackware/')
+relbase=$(echo ${RELEASE} | sed 's/slackware-8.0/slakware/' | cut -d- -f1 | sed 's/armedslack/slackware/;s/slackwarearm/slackware/;s/slackwareaarch64/slackware/')
+pkgdelimiter="-"
+pkgcheck="both"
+[ "${RELEASE}" = "slackware-8.0" ] && pkgdelimiter="\."
+[ "${RELEASE}" = "slackware-8.0" ] && pkgcheck=md5
 if [ ! -f ${CACHEFS}/paths ] ; then
 	bash ${CWD}/get_paths.sh -r ${RELEASE} -m ${MIRROR} > ${CACHEFS}/paths
-fi
-if [ ! -f ${CACHEFS}/paths-patches ] ; then
-	bash ${CWD}/get_paths.sh -r ${RELEASE} -m ${MIRROR} -p > ${CACHEFS}/paths-patches
-fi
-if [ ! -f ${CACHEFS}/paths-extra ] ; then
-	bash ${CWD}/get_paths.sh -r ${RELEASE} -m ${MIRROR} -e > ${CACHEFS}/paths-extra
 fi
 for pkg in ${base_pkgs}
 do
@@ -240,22 +265,22 @@ do
 		installer_fix=true
 		pkg=a/aaa_glibc-solibs
 	fi
-	path=$(grep "^packages/$(basename "${pkg}")-" ${CACHEFS}/paths-patches | cut -d : -f 1)
-	if [ ${#path} -eq 0 ] ; then
-		path=$(grep ^${pkg}- ${CACHEFS}/paths | cut -d : -f 1)
-		if [ ${#path} -eq 0 ] ; then
-			path=$(grep "^$(basename "${pkg}")/$(basename "${pkg}")-" ${CACHEFS}/paths-extra | cut -d : -f 1)
-			if [ ${#path} -eq 0 ] ; then
+	path=$(grep "^patches/packages/$(basename "${pkg}")${pkgdelimiter}" ${CACHEFS}/paths || true)
+	if [ "${path}" = "" ] ; then
+		path=$(grep "^${relbase}/${pkg}${pkgdelimiter}" ${CACHEFS}/paths || true)
+		if [ "${path}" = "" ] ; then
+			path=$(grep "^extra/$(basename "${pkg}")/$(basename "${pkg}")${pkgdelimiter}" ${CACHEFS}/paths || true)
+			if [ "${path}" = "" ] ; then
 				echo "$pkg not found"
 				continue
 			else
-				l_pkg=$(cacheit extra/$path "both")
+				l_pkg=$(cacheit $path "$pkgcheck")
 			fi
 		else
-			l_pkg=$(cacheit $relbase/$path "both")
+			l_pkg=$(cacheit $path "$pkgcheck")
 		fi
 	else
-		l_pkg=$(cacheit patches/$path "both")
+		l_pkg=$(cacheit $path "$pkgcheck")
 	fi
 	if $installer_fix ; then
 		echo PATH=/bin:/sbin:/usr/bin:/usr/sbin \
